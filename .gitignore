@@ -1,0 +1,32 @@
+# Python stuff
+*.pyc
+__pycache__
+
+# macOS
+.DS_Store
+
+# Python binaries
+*.egg-info
+dist
+build
+
+# Visual Studio code settings
+.vscode
+
+# database
+*sqlite3*
+*.rdb
+pgbackups
+database_data
+
+# static
+static
+media
+
+# cache
+.pytest_cache
+
+# settings
+config.yml
+django_production.py
+.env

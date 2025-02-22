@@ -1,0 +1,82 @@
+x-common-env-vars:
+  - &postgres-db
+    POSTGRES_DB=ballsdex
+  - &postgres-user
+    POSTGRES_USER=ballsdex
+  - &postgres-url
+    "BALLSDEXBOT_DB_URL=postgres://ballsdex:${POSTGRES_PASSWORD}@postgres:5432/ballsdex"
+
+services:
+  bot:
+    restart: "no"
+    image: ballsdex
+    build: .
+    environment:
+      - *postgres-url
+    depends_on:
+      - postgres-db
+    volumes:
+      - ./ballsdex:/code
+      - ./media:/code/admin_panel/media
+      - ./config.yml:/code/config.yml
+    tty: true
+    command: >
+      bash -c "
+      cd admin_panel &&
+      poetry --quiet run python3 manage.py migrate --no-input --fake-initial &&
+      cd .. && poetry --quiet run python3 -m ballsdex"
+  
+  admin-panel:
+    image: ballsdex
+    build: .
+    ports:
+      - "31617:8000"
+    environment:
+      - *postgres-url
+      # if serving the admin panel online, copy the file "production.example.py" and uncomment
+      - DJANGO_SETTINGS_MODULE=admin_panel.settings.production
+    depends_on:
+      - postgres-db
+    volumes:
+      - ./ballsdex:/code
+      - ./django_production.py:/code/admin_panel/admin_panel/settings/production.py
+      - ./config.yml:/code/config.yml
+      - ./media:/code/admin_panel/media
+    tty: true
+    working_dir: /code/admin_panel
+    command: >
+      bash -c "
+      poetry --quiet run python3 manage.py migrate --no-input --fake-initial &&
+      poetry --quiet run python3 manage.py collectstatic --no-input &&
+      poetry --quiet run uvicorn admin_panel.asgi:application --host 0.0.0.0"
+
+  postgres-db:
+      image: postgres
+      restart: always
+      hostname: postgres
+      shm_size: 1g
+      environment:
+        - *postgres-db
+        - *postgres-user
+        - POSTGRES_PASSWORD
+      volumes:  # Persist the db data
+        - ./database-data:/var/lib/postgresql/data
+  
+  postgres-backup:
+      image: prodrigestivill/postgres-backup-local
+      restart: always
+      user: postgres:postgres
+      volumes:
+        - ./pgbackups:/backups
+      depends_on:
+        - postgres-db
+      environment:
+        - *postgres-db
+        - *postgres-user
+        - POSTGRES_PASSWORD
+        - POSTGRES_HOST=postgres
+        - SCHEDULE=@daily
+        - BACKUP_KEEP_DAYS=7
+        - BACKUP_KEEP_WEEKS=4
+        - BACKUP_KEEP_MONTHS=6
+        - HEALTHCHECK_PORT=3928
