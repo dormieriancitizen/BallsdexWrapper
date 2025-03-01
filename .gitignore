@@ -30,3 +30,4 @@ media
 config.yml
 django_production.py
 .env
+patches

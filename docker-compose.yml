@@ -16,12 +16,21 @@ services:
     depends_on:
       - postgres-db
     volumes:
+      - ./src-extra:/src-extra
       - ./ballsdex:/code
       - ./media:/code/admin_panel/media
       - ./config.yml:/code/config.yml
+      - ./patches/core/image_generator/image_gen.py:/code/ballsdex/core/image_generator/image_gen.py
+      - ./patches/packages/admin/__init__.py:/code/ballsdex/packages/admin/__init__.py
+      - ./patches/packages/admin/custom.py:/code/ballsdex/packages/admin/custom.py
+      - ./patches/packages/countryballs/countryball.py:/code/ballsdex/packages/countryballs/countryball.py
+      - ./patches/packages/countryballs/cog.py:/code/ballsdex/packages/countryballs/cog.py
+      - ./patches/packages/countryballs/customspawn.py:/code/ballsdex/packages/countryballs/customspawn.py
     tty: true
+    ports:
+      - "50677:50677"
     command: >
-      bash -c "
+      sh -c "
       cd admin_panel &&
       poetry --quiet run python3 manage.py migrate --no-input --fake-initial &&
       cd .. && poetry --quiet run python3 -m ballsdex"
@@ -38,14 +47,17 @@ services:
     depends_on:
       - postgres-db
     volumes:
+      - ./src-extra:/src-extra
       - ./ballsdex:/code
       - ./django_production.py:/code/admin_panel/admin_panel/settings/production.py
       - ./config.yml:/code/config.yml
       - ./media:/code/admin_panel/media
+      - ./config.yml:/code/config.yml
+      - ./patches/core/image_generator/image_gen.py:/code/ballsdex/core/image_generator/image_gen.py
     tty: true
     working_dir: /code/admin_panel
     command: >
-      bash -c "
+      sh -c "
       poetry --quiet run python3 manage.py migrate --no-input --fake-initial &&
       poetry --quiet run python3 manage.py collectstatic --no-input &&
       poetry --quiet run uvicorn admin_panel.asgi:application --host 0.0.0.0"
