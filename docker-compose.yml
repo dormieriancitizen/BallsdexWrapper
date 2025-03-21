@@ -14,7 +14,10 @@ services:
     environment:
       - *postgres-url
     depends_on:
-      - postgres-db
+      migration:
+        condition: service_started
+      postgres-db:
+        condition: service_healthy
     volumes:
       - ./ballsdex:/code
       - ./media:/code/admin_panel/media
@@ -22,11 +25,7 @@ services:
     tty: true
     ports:
       - "50677:50677"
-    command: >
-      sh -c "
-      cd admin_panel &&
-      poetry --quiet run python3 manage.py migrate --no-input --fake-initial &&
-      cd .. && poetry --quiet run python3 -m ballsdex"
+    command: "poetry --quiet run python3 -m ballsdex --dev"
   
   admin-panel:
     image: ballsdex
@@ -38,7 +37,10 @@ services:
       # if serving the admin panel online, copy the file "production.example.py" and uncomment
       - DJANGO_SETTINGS_MODULE=admin_panel.settings.production
     depends_on:
-      - postgres-db
+      migration:
+        condition: service_started
+      postgres-db:
+        condition: service_healthy
     volumes:
       - ./ballsdex:/code
       - ./django_production.py:/code/admin_panel/admin_panel/settings/production.py
@@ -47,11 +49,26 @@ services:
       - ./config.yml:/code/config.yml
     tty: true
     working_dir: /code/admin_panel
+    command: "poetry --quiet run uvicorn admin_panel.asgi:application --host 0.0.0.0"
+
+  migration:
+    image: ballsdex
+    build: .
+    environment:
+      - *postgres-url
+    volumes:
+      - ./ballsdex:/code
+      - ./media:/code/admin_panel/media
+      - ./config.yml:/code/config.yml
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    working_dir: /code/admin_panel
     command: >
       sh -c "
       poetry --quiet run python3 manage.py migrate --no-input --fake-initial &&
-      poetry --quiet run python3 manage.py collectstatic --no-input &&
-      poetry --quiet run uvicorn admin_panel.asgi:application --host 0.0.0.0"
+      poetry --quiet run python3 manage.py collectstatic --no-input
+      "
 
   postgres-db:
       image: postgres
@@ -64,7 +81,12 @@ services:
         - POSTGRES_PASSWORD
       volumes:  # Persist the db data
         - ./database-data:/var/lib/postgresql/data
-  
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+
   postgres-backup:
       image: prodrigestivill/postgres-backup-local
       restart: always
