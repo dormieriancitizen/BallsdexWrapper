@@ -1,1 +1,1 @@
-## Ballsdex wrapped in a different docker-compose that works better for my usecase
+These changes have been added to my fork of ballsdex
